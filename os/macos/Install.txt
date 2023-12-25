@@ -1,0 +1,1 @@
+Drag "OpenTTD-discord-social.app" into "social_integration" folder under OpenTTD in your Documents folder.
