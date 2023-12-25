@@ -1,0 +1,6 @@
+/.vs/
+/build*
+/lib/
+/out/
+/src/discord_sdk/
+CMakeSettings.json
