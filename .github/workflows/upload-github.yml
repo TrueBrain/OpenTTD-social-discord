@@ -1,0 +1,49 @@
+name: Upload (Steam)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  upload:
+    name: Upload (GitHub)
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Download source
+      uses: actions/download-artifact@v3
+      with:
+        name: internal-source
+        path: internal-source
+
+    # - name: Download bundle (Windows x86)
+    #   uses: actions/download-artifact@v3
+    #   with:
+    #     name: discord-social-windows-x86
+    #     path: discord-social-windows-x86
+
+    # - name: Download bundle (Windows x64)
+    #   uses: actions/download-artifact@v3
+    #   with:
+    #     name: discord-social-windows-x64
+    #     path: discord-social-windows-x64
+
+    # - name: Download bundle (MacOS)
+    #   uses: actions/download-artifact@v3
+    #   with:
+    #     name: discord-social-macos-universal
+    #     path: discord-social-macos-universal
+
+    - name: Download bundle (Linux)
+      uses: actions/download-artifact@v3
+      with:
+        name: discord-social-linux-generic
+        path: discord-social-linux-generic
+
+    - name: Upload to GitHub
+      run: |
+        gh release upload ${{ inputs.version }} discord-social-linux-generic/*
