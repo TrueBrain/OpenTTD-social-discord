@@ -1,0 +1,100 @@
+name: Release (MacOS)
+
+on:
+  workflow_call:
+    inputs:
+      discord_game_sdk_version:
+        required: true
+        type: string
+
+jobs:
+  macos:
+    name: MacOS
+
+    runs-on: macos-12
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 10.13
+
+    steps:
+    - name: Download source
+      uses: actions/download-artifact@v3
+      with:
+        name: internal-source
+
+    - name: Unpack source
+      run: |
+        tar -xf source.tar.gz --strip-components=1
+
+    - name: Install Discord SDK
+      shell: bash
+      run: |
+        ./download-sdk.sh ${{ inputs.discord_game_sdk_version }}
+
+    - name: Install GCC problem matcher
+      uses: ammaraskar/gcc-problem-matcher@master
+
+    - name: Build arm64
+      run: |
+        mkdir build-arm64
+        cd build-arm64
+
+        echo "::group::CMake"
+        cmake ${GITHUB_WORKSPACE} \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+          # EOF
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        echo "Running on $(sysctl -n hw.logicalcpu) cores"
+        cmake --build . -j $(sysctl -n hw.logicalcpu)
+        echo "::endgroup::"
+
+    - name: Build x64
+      run: |
+        mkdir build-x64
+        cd build-x64
+
+        echo "::group::CMake"
+        cmake ${GITHUB_WORKSPACE} \
+          -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+          -DAPPLE_UNIVERSAL_PACKAGE=1 \
+          # EOF
+        echo "::endgroup::"
+
+        echo "::group::Build"
+        echo "Running on $(sysctl -n hw.logicalcpu) cores"
+        cmake --build . -j $(sysctl -n hw.logicalcpu)
+        echo "::endgroup::"
+
+    - name: Create bundles
+      run: |
+        # We first install both targets, as that changes the RPath to $ORIGIN.
+        # This cannot be done after making an universal binary anymore.
+        (
+          cd build-arm64
+          make install
+        )
+
+        cd build-x64
+        make install
+
+        echo "::group::Create universal binary"
+        # Combine the binaries from each build into a single file
+        lipo -create -output libdiscord-social.dylib ../build-*/install/libdiscord-social.dylib
+        lipo -create -output discord_game_sdk.dylib ../build-*/install/discord_game_sdk.dylib
+        echo "::endgroup::"
+
+        echo "::group::Run CPack"
+        cpack
+        echo "::endgroup::"
+
+    - name: Store bundles
+      uses: actions/upload-artifact@v3
+      with:
+        name: discord-social-macos-universal
+        path: build-x64/bundles
+        retention-days: 5
